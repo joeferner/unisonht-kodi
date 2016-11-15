@@ -1,0 +1,25 @@
+{
+  "name": "unisonht-kodi",
+  "version": "1.0.0",
+  "description": "UnisonHT Plugin for Kodi",
+  "main": "index.js",
+  "scripts": {
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/joeferner/unisonht-kodi.git"
+  },
+  "keywords": [
+    "unisonht",
+    "tivo"
+  ],
+  "author": "Joe Ferner <joe@fernsroth.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/joeferner/unisonht-kodi/issues"
+  },
+  "homepage": "https://github.com/joeferner/unisonht-kodi#readme",
+  "dependencies": {
+    "unisonht": "^1.0.0"
+  }
+}
