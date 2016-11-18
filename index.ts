@@ -70,7 +70,7 @@ export default class Kodi extends Device {
     });
   }
 
-  private getStatus() {
+  getStatus(): Promise<any> {
     return this.sendJsonRequest({
       method: 'JSONRPC.Version',
     });
