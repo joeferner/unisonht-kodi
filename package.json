@@ -3,8 +3,7 @@
   "version": "1.0.0",
   "description": "UnisonHT Plugin for Kodi",
   "main": "index.js",
-  "scripts": {
-  },
+  "scripts": {},
   "repository": {
     "type": "git",
     "url": "git+https://github.com/joeferner/unisonht-kodi.git"
@@ -20,6 +19,7 @@
   },
   "homepage": "https://github.com/joeferner/unisonht-kodi#readme",
   "dependencies": {
-    "unisonht": "^1.0.0"
+    "unisonht": "^1.0.0",
+    "wol": "^1.0.3"
   }
 }
