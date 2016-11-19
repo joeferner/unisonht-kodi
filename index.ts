@@ -25,14 +25,6 @@ export default class Kodi implements UnisonHTDevice {
     return this.options.name;
   }
 
-  start(unisonht: UnisonHT): Promise<void> {
-    return Promise.resolve();
-  }
-
-  stop(): Promise<void> {
-    return Promise.resolve();
-  }
-
   ensureOn(): Promise<void> {
     return this.wakeUp(60);
   }
