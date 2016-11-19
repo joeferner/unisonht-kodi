@@ -1,30 +1,36 @@
-import {Device, DeviceOptions} from "unisonht/lib/Device";
+/// <reference path="./wol.d.ts" />
+
+import {UnisonHT, UnisonHTDevice} from "unisonht";
 import * as net from "net";
 import * as wol from "wol";
 import createLogger from "unisonht/lib/Log";
 
 const log = createLogger('kodi');
 
-interface KodiOptions extends DeviceOptions {
-  address: string;
-  port?: number;
-  mac: string;
-  shutdown?: boolean;
-}
-
-export default class Kodi extends Device {
-  private options: KodiOptions;
+export default class Kodi implements UnisonHTDevice {
+  private options: Kodi.Options;
   private socket: net.Socket;
 
   static get JSON_PORT() {
     return 9090;
   }
 
-  constructor(options: KodiOptions) {
-    super(options);
+  constructor(options: Kodi.Options) {
     this.options = options;
     this.options.port = this.options.port || Kodi.JSON_PORT;
     this.options.shutdown = this.options.shutdown !== undefined ? this.options.shutdown : false;
+  }
+
+  getName(): string {
+    return this.options.name;
+  }
+
+  start(unisonht: UnisonHT): Promise<void> {
+    return Promise.resolve();
+  }
+
+  stop(): Promise<void> {
+    return Promise.resolve();
   }
 
   ensureOn(): Promise<void> {
@@ -35,7 +41,7 @@ export default class Kodi extends Device {
     if (this.options.shutdown) {
       return this.sendShutdown();
     } else {
-      return super.ensureOff();
+      return Promise.resolve();
     }
   }
 
@@ -173,5 +179,15 @@ export default class Kodi extends Device {
       default:
         return button.substr(0, 1).toUpperCase() + button.substr(1);
     }
+  }
+}
+
+module Kodi {
+  export interface Options {
+    name: string;
+    address: string;
+    port?: number;
+    mac: string;
+    shutdown?: boolean;
   }
 }
