@@ -1,6 +1,4 @@
-/// <reference path="./wol.d.ts" />
-
-import {UnisonHT, UnisonHTDevice} from "unisonht";
+import {UnisonHTDevice} from "unisonht";
 import * as net from "net";
 import * as wol from "wol";
 import createLogger from "unisonht/lib/Log";
@@ -38,6 +36,7 @@ export default class Kodi implements UnisonHTDevice {
   }
 
   buttonPress(button: string): Promise<void> {
+    log.debug(`buttonPress ${button}`);
     const kodiButton = Kodi.translateButtonToKodi(button);
     return this.sendJsonRequest({
       method: 'Input.' + kodiButton
@@ -82,6 +81,7 @@ export default class Kodi implements UnisonHTDevice {
     return new Promise((resolve, reject) => {
       wol.wake(this.options.mac, (err) => {
         if (err) {
+          log.error('send wol failed: ', err);
           return reject(err);
         }
         resolve();
@@ -141,7 +141,7 @@ export default class Kodi implements UnisonHTDevice {
 
   private getSocket(): Promise<net.Socket> {
     return new Promise((resolve, reject)=> {
-      if (this.socket) {
+      if (this.socket && this.socket.writable) {
         return resolve(this.socket);
       }
       log.debug('connecting to %s:%d', this.options.address, this.options.port);
