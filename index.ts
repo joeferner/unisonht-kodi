@@ -40,35 +40,51 @@ export default class Kodi implements UnisonHTDevice {
   buttonPress(button: string): Promise<void> {
     log.debug(`buttonPress ${button}`);
     const kodiButton = Kodi.translateButtonToKodi(button);
-    let request: any;
-    if (button === 'PAUSE' || button === 'PLAY'){
-      request = {
+    if (button === 'PAUSE' || button === 'PLAY') {
+      this.speed = 1;
+      return this.sendPlayerJsonRequest({
         method: 'Player.PlayPause',
         params: {
           playerid: 0
         }
-      };
+      });
     } else if (button === 'FASTFORWARD' || button === 'REWIND') {
-      request = {
-            method: 'Player.PlayPause',
-            params: {
-                playerid: 0,
-                speed: this.getNextSpeed(button === 'FASTFORWARD' ? 1 : -1)
-            }
-        };
+      return this.sendPlayerJsonRequest({
+        method: 'Player.SetSpeed',
+        params: {
+          speed: this.getNextSpeed(button === 'FASTFORWARD' ? 1 : -1)
+        }
+      });
     } else {
-      request = {
+      return this.sendJsonRequest({
         method: `Input.${kodiButton}`
-      };
+      });
     }
-    return this.sendJsonRequest(request);
+  }
+
+  private sendPlayerJsonRequest(request: any): Promise<void> {
+    return this.sendJsonRequest({
+      method: `Player.GetActivePlayers`
+    })
+    .then((activePlayers) => {
+      request.params.playerid = activePlayers.result[0].playerid;
+      return this.sendJsonRequest(request);
+    });
   }
 
   private getNextSpeed(dir): number {
     if (this.speed == 1 && dir < 0) {
       this.speed = -1;
-    } else {
-      this.speed = this.speed * (2 * dir);
+    } else if (this.speed == -1 && dir > 0) {
+      this.speed = 1;
+    } else if (dir < 0 && this.speed > 0) {
+      this.speed = this.speed / 2;
+    } else if (dir > 0 && this.speed > 0) {
+      this.speed = this.speed * 2;
+    } else if (dir < 0 && this.speed < 0) {
+      this.speed = this.speed * 2;
+    } else if (dir > 0 && this.speed < 0) {
+      this.speed = this.speed / 2;
     }
     return this.speed;
   }
@@ -131,7 +147,7 @@ export default class Kodi implements UnisonHTDevice {
     data.jsonrpc = data.jsonrpc || '2.0';
     data.id = data.id || '' + new Date().getTime();
 
-    this.getSocket()
+    return this.getSocket()
       .then((socket) => {
         return new Promise((resolve, reject) => {
           const removeSocketListeners = (err: Error, result?) => {
@@ -165,8 +181,6 @@ export default class Kodi implements UnisonHTDevice {
           });
         });
       });
-
-    return Promise.resolve();
   }
 
   private getSocket(): Promise<net.Socket> {
