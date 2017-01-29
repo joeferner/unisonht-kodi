@@ -8,12 +8,14 @@ const log = createLogger('kodi');
 export default class Kodi implements UnisonHTDevice {
   private options: Kodi.Options;
   private socket: net.Socket;
+  private speed: number;
 
   static get JSON_PORT() {
     return 9090;
   }
 
   constructor(options: Kodi.Options) {
+    this.speed = 1;
     this.options = options;
     this.options.port = this.options.port || Kodi.JSON_PORT;
     this.options.shutdown = this.options.shutdown !== undefined ? this.options.shutdown : false;
@@ -38,9 +40,37 @@ export default class Kodi implements UnisonHTDevice {
   buttonPress(button: string): Promise<void> {
     log.debug(`buttonPress ${button}`);
     const kodiButton = Kodi.translateButtonToKodi(button);
-    return this.sendJsonRequest({
-      method: 'Input.' + kodiButton
-    });
+    let request: any;
+    if (button === 'PAUSE' || button === 'PLAY'){
+      request = {
+        method: 'Player.PlayPause',
+        params: {
+          playerid: 0
+        }
+      };
+    } else if (button === 'FASTFORWARD' || button === 'REWIND') {
+      request = {
+            method: 'Player.PlayPause',
+            params: {
+                playerid: 0,
+                speed: this.getNextSpeed(button === 'FASTFORWARD' ? 1 : -1)
+            }
+        };
+    } else {
+      request = {
+        method: `Input.${kodiButton}`
+      };
+    }
+    return this.sendJsonRequest(request);
+  }
+
+  private getNextSpeed(dir): number {
+    if (this.speed == 1 && dir < 0) {
+      this.speed = -1;
+    } else {
+      this.speed = this.speed * (2 * dir);
+    }
+    return this.speed;
   }
 
   private wakeUp(retryCount): Promise<void> {
@@ -73,12 +103,12 @@ export default class Kodi implements UnisonHTDevice {
     });
   }
 
-  private sendWakeOnLan() {
+  private sendWakeOnLan(): Promise<void> {
     if (!this.options.mac) {
       log.warn("Cannot send wake on lan because no MAC address was specified in the config.");
       return;
     }
-    return new Promise((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
       wol.wake(this.options.mac, (err) => {
         if (err) {
           log.error('send wol failed: ', err);
