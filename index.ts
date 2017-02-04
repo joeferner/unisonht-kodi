@@ -1,11 +1,9 @@
-import {UnisonHTDevice} from "unisonht";
+import {Device, UnisonHT, PromiseResponderResponse} from "unisonht";
 import * as net from "net";
 import * as wol from "wol";
-import createLogger from "unisonht/lib/Log";
+import * as express from "express";
 
-const log = createLogger('kodi');
-
-export default class Kodi implements UnisonHTDevice {
+export class Kodi extends Device {
   private options: Kodi.Options;
   private socket: net.Socket;
   private speed: number;
@@ -14,51 +12,63 @@ export default class Kodi implements UnisonHTDevice {
     return 9090;
   }
 
-  constructor(options: Kodi.Options) {
+  constructor(deviceName: string, options: Kodi.Options) {
+    super(deviceName);
     this.speed = 1;
     this.options = options;
     this.options.port = this.options.port || Kodi.JSON_PORT;
     this.options.shutdown = this.options.shutdown !== undefined ? this.options.shutdown : false;
   }
 
-  getName(): string {
-    return this.options.name;
+  start(unisonht: UnisonHT): Promise<void> {
+    return super.start(unisonht)
+      .then(() => {
+        unisonht.getApp().post(`${this.getPathPrefix()}/on`, this.handleOn.bind(this));
+        unisonht.getApp().post(`${this.getPathPrefix()}/off`, this.handleOff.bind(this));
+      });
   }
 
-  ensureOn(): Promise<void> {
-    return this.wakeUp(60);
+  handleOn(req: express.Request, res: express.Response, next: express.NextFunction): void {
+    (<PromiseResponderResponse>res).promiseNoContent(this.wakeUp(60));
   }
 
-  ensureOff(): Promise<void> {
+  handleOff(req: express.Request, res: express.Response, next: express.NextFunction): void {
     if (this.options.shutdown) {
-      return this.sendShutdown();
+      (<PromiseResponderResponse>res).promiseNoContent(this.sendShutdown());
     } else {
-      return Promise.resolve();
+      (<PromiseResponderResponse>res).promiseNoContent(Promise.resolve());
     }
   }
 
-  buttonPress(button: string): Promise<void> {
-    log.debug(`buttonPress ${button}`);
-    const kodiButton = Kodi.translateButtonToKodi(button);
-    if (button === 'PAUSE' || button === 'PLAY') {
+  protected handleButtonPress(req: express.Request, res: express.Response, next: express.NextFunction): void {
+    const buttonName = req.query.button;
+    this.log.debug(`buttonPress ${buttonName}`);
+    const kodiButton = Kodi.translateButtonToKodi(buttonName);
+    if (buttonName === 'PAUSE' || buttonName === 'PLAY') {
       this.speed = 1;
-      return this.sendPlayerJsonRequest({
-        method: 'Player.PlayPause',
-        params: {
-          playerid: 0
-        }
-      });
-    } else if (button === 'FASTFORWARD' || button === 'REWIND') {
-      return this.sendPlayerJsonRequest({
-        method: 'Player.SetSpeed',
-        params: {
-          speed: this.getNextSpeed(button === 'FASTFORWARD' ? 1 : -1)
-        }
-      });
+      (<PromiseResponderResponse>res).promiseNoContent(
+        this.sendPlayerJsonRequest({
+          method: 'Player.PlayPause',
+          params: {
+            playerid: 0
+          }
+        })
+      );
+    } else if (buttonName === 'FASTFORWARD' || buttonName === 'REWIND') {
+      (<PromiseResponderResponse>res).promiseNoContent(
+        this.sendPlayerJsonRequest({
+          method: 'Player.SetSpeed',
+          params: {
+            speed: this.getNextSpeed(buttonName === 'FASTFORWARD' ? 1 : -1)
+          }
+        })
+      );
     } else {
-      return this.sendJsonRequest({
-        method: `Input.${kodiButton}`
-      });
+      (<PromiseResponderResponse>res).promiseNoContent(
+        this.sendJsonRequest({
+          method: `Input.${kodiButton}`
+        })
+      );
     }
   }
 
@@ -66,10 +76,10 @@ export default class Kodi implements UnisonHTDevice {
     return this.sendJsonRequest({
       method: `Player.GetActivePlayers`
     })
-    .then((activePlayers) => {
-      request.params.playerid = activePlayers.result[0].playerid;
-      return this.sendJsonRequest(request);
-    });
+      .then((activePlayers) => {
+        request.params.playerid = activePlayers.result[0].playerid;
+        return this.sendJsonRequest(request);
+      });
   }
 
   private getNextSpeed(dir): number {
@@ -91,16 +101,17 @@ export default class Kodi implements UnisonHTDevice {
 
   private wakeUp(retryCount): Promise<void> {
     return this.sendWakeOnLan()
-      .then(()=> {
-        return this.getStatus();
+      .then((): Promise<void> => {
+        return this.getStatus().then(() => {
+        });
       })
-      .catch((err)=> {
-        log.debug('trying to wakeup kodi', err);
+      .catch((err) => {
+        this.log.debug('trying to wakeup kodi', err);
         if (retryCount === 0) {
           return Promise.reject(err);
         } else {
           return this.sleep(1000)
-            .then(()=> {
+            .then(() => {
               return this.wakeUp(retryCount--);
             });
         }
@@ -113,21 +124,27 @@ export default class Kodi implements UnisonHTDevice {
     });
   }
 
-  getStatus(): Promise<any> {
+  getStatus(): Promise<Device.Status> {
     return this.sendJsonRequest({
       method: 'JSONRPC.Version',
-    });
+    })
+      .then((kodiStatus) => {
+        return {
+          power: Device.PowerState.ON,
+          kodiStatus: kodiStatus.result ? kodiStatus.result : kodiStatus
+        };
+      });
   }
 
   private sendWakeOnLan(): Promise<void> {
     if (!this.options.mac) {
-      log.warn("Cannot send wake on lan because no MAC address was specified in the config.");
+      this.log.warn("Cannot send wake on lan because no MAC address was specified in the config.");
       return;
     }
     return new Promise<void>((resolve, reject) => {
       wol.wake(this.options.mac, (err) => {
         if (err) {
-          log.error('send wol failed: ', err);
+          this.log.error('send wol failed: ', err);
           return reject(err);
         }
         resolve();
@@ -136,8 +153,8 @@ export default class Kodi implements UnisonHTDevice {
   }
 
   private sleep(ms: number) {
-    return new Promise((resolve)=> {
-      setTimeout(()=> {
+    return new Promise((resolve) => {
+      setTimeout(() => {
         resolve();
       }, ms);
     });
@@ -160,13 +177,13 @@ export default class Kodi implements UnisonHTDevice {
             }
           };
 
-          log.debug('sending', JSON.stringify(data));
+          this.log.debug('sending', JSON.stringify(data));
           socket.on('error', (err) => {
-            log.error('could not send', err);
+            this.log.error('could not send', err);
             removeSocketListeners(err);
           });
           socket.on('data', (data) => {
-            log.debug('receive', data.toString());
+            this.log.debug('receive', data.toString());
             try {
               const json = JSON.parse(data.toString());
               removeSocketListeners(null, json);
@@ -184,21 +201,21 @@ export default class Kodi implements UnisonHTDevice {
   }
 
   private getSocket(): Promise<net.Socket> {
-    return new Promise((resolve, reject)=> {
+    return new Promise((resolve, reject) => {
       if (this.socket && this.socket.writable) {
         return resolve(this.socket);
       }
-      log.debug('connecting to %s:%d', this.options.address, this.options.port);
+      this.log.debug('connecting to %s:%d', this.options.address, this.options.port);
       this.socket = net.connect({
         host: this.options.address,
         port: this.options.port
       });
       this.socket.once('error', (err) => {
-        log.error('connect error', err);
+        this.log.error('connect error', err);
         reject(err);
       });
       this.socket.on('connect', () => {
-        log.debug('connected to kodi');
+        this.log.debug('connected to kodi');
         this.socket.removeAllListeners('error');
         resolve(this.socket);
       });
@@ -218,9 +235,8 @@ export default class Kodi implements UnisonHTDevice {
   }
 }
 
-module Kodi {
+export module Kodi {
   export interface Options {
-    name: string;
     address: string;
     port?: number;
     mac: string;

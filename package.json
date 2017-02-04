@@ -19,7 +19,13 @@
   },
   "homepage": "https://github.com/joeferner/unisonht-kodi#readme",
   "dependencies": {
-    "unisonht": "^1.0.0",
-    "wol": "^1.0.3"
+    "wol": "^1.0.3",
+    "@types/boom": "^0.0.33",
+    "@types/express": "^4.0.35",
+    "@types/http-status-codes": "^1.0.29",
+    "boom": "^4.2.0",
+    "express": "^4.14.1",
+    "http-status-codes": "^1.1.6",
+    "unisonht": "^1.0.0"
   }
 }

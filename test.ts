@@ -1,9 +1,11 @@
-const repl = require('repl');
-const Kodi = require('.').default;
-var kodi = new Kodi({
+import {UnisonHT} from "unisonht";
+import {Kodi} from ".";
+
+const unisonht = new UnisonHT();
+
+unisonht.use(new Kodi('kodi', {
   address: '192.168.0.170',
   mac: 'b8:27:eb:56:17:3c'
-});
+}));
 
-const r = repl.start('> ');
-r.context.kodi = kodi;
+unisonht.listen(3000);

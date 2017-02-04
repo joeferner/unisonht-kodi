@@ -6,7 +6,6 @@
   "files": [
     "index.ts",
     "test.ts",
-    "wol.d.ts",
-    "typings/index.d.ts"
+    "wol.d.ts"
   ]
 }
