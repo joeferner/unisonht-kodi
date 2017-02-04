@@ -1,4 +1,4 @@
-import {Device, UnisonHT, PromiseResponderResponse} from "unisonht";
+import {Device, UnisonHT} from "unisonht";
 import * as net from "net";
 import * as wol from "wol";
 import * as express from "express";
@@ -29,14 +29,14 @@ export class Kodi extends Device {
   }
 
   handleOn(req: express.Request, res: express.Response, next: express.NextFunction): void {
-    (<PromiseResponderResponse>res).promiseNoContent(this.wakeUp(60));
+    res.promiseNoContent(this.wakeUp(60));
   }
 
   handleOff(req: express.Request, res: express.Response, next: express.NextFunction): void {
     if (this.options.shutdown) {
-      (<PromiseResponderResponse>res).promiseNoContent(this.sendShutdown());
+      res.promiseNoContent(this.sendShutdown());
     } else {
-      (<PromiseResponderResponse>res).promiseNoContent(Promise.resolve());
+      res.promiseNoContent(Promise.resolve());
     }
   }
 
@@ -46,7 +46,7 @@ export class Kodi extends Device {
     const kodiButton = Kodi.translateButtonToKodi(buttonName);
     if (buttonName === 'PAUSE' || buttonName === 'PLAY') {
       this.speed = 1;
-      (<PromiseResponderResponse>res).promiseNoContent(
+      res.promiseNoContent(
         this.sendPlayerJsonRequest({
           method: 'Player.PlayPause',
           params: {
@@ -55,7 +55,7 @@ export class Kodi extends Device {
         })
       );
     } else if (buttonName === 'FASTFORWARD' || buttonName === 'REWIND') {
-      (<PromiseResponderResponse>res).promiseNoContent(
+      res.promiseNoContent(
         this.sendPlayerJsonRequest({
           method: 'Player.SetSpeed',
           params: {
@@ -64,7 +64,7 @@ export class Kodi extends Device {
         })
       );
     } else {
-      (<PromiseResponderResponse>res).promiseNoContent(
+      res.promiseNoContent(
         this.sendJsonRequest({
           method: `Input.${kodiButton}`
         })
