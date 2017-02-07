@@ -1,10 +1,9 @@
-import {Device, UnisonHT} from "unisonht";
+import {Device, UnisonHT, UnisonHTResponse} from "unisonht";
 import * as net from "net";
 import * as wol from "wol";
 import * as express from "express";
 
 export class Kodi extends Device {
-  private options: Kodi.Options;
   private socket: net.Socket;
   private speed: number;
 
@@ -13,11 +12,10 @@ export class Kodi extends Device {
   }
 
   constructor(deviceName: string, options: Kodi.Options) {
-    super(deviceName);
+    super(deviceName, options);
     this.speed = 1;
-    this.options = options;
-    this.options.port = this.options.port || Kodi.JSON_PORT;
-    this.options.shutdown = this.options.shutdown !== undefined ? this.options.shutdown : false;
+    options.port = options.port || Kodi.JSON_PORT;
+    options.shutdown = options.shutdown !== undefined ? options.shutdown : false;
   }
 
   start(unisonht: UnisonHT): Promise<void> {
@@ -28,19 +26,19 @@ export class Kodi extends Device {
       });
   }
 
-  handleOn(req: express.Request, res: express.Response, next: express.NextFunction): void {
+  handleOn(req: express.Request, res: UnisonHTResponse, next: express.NextFunction): void {
     res.promiseNoContent(this.wakeUp(60));
   }
 
-  handleOff(req: express.Request, res: express.Response, next: express.NextFunction): void {
-    if (this.options.shutdown) {
+  handleOff(req: express.Request, res: UnisonHTResponse, next: express.NextFunction): void {
+    if (this.getOptions().shutdown) {
       res.promiseNoContent(this.sendShutdown());
     } else {
       res.promiseNoContent(Promise.resolve());
     }
   }
 
-  protected handleButtonPress(req: express.Request, res: express.Response, next: express.NextFunction): void {
+  protected handleButtonPress(req: express.Request, res: UnisonHTResponse, next: express.NextFunction): void {
     const buttonName = req.query.button;
     this.log.debug(`buttonPress ${buttonName}`);
     const kodiButton = Kodi.translateButtonToKodi(buttonName);
@@ -137,12 +135,12 @@ export class Kodi extends Device {
   }
 
   private sendWakeOnLan(): Promise<void> {
-    if (!this.options.mac) {
+    if (!this.getOptions().mac) {
       this.log.warn("Cannot send wake on lan because no MAC address was specified in the config.");
       return;
     }
     return new Promise<void>((resolve, reject) => {
-      wol.wake(this.options.mac, (err) => {
+      wol.wake(this.getOptions().mac, (err) => {
         if (err) {
           this.log.error('send wol failed: ', err);
           return reject(err);
@@ -205,10 +203,10 @@ export class Kodi extends Device {
       if (this.socket && this.socket.writable) {
         return resolve(this.socket);
       }
-      this.log.debug('connecting to %s:%d', this.options.address, this.options.port);
+      this.log.debug('connecting to %s:%d', this.getOptions().address, this.getOptions().port);
       this.socket = net.connect({
-        host: this.options.address,
-        port: this.options.port
+        host: this.getOptions().address,
+        port: this.getOptions().port
       });
       this.socket.once('error', (err) => {
         this.log.error('connect error', err);
@@ -233,10 +231,14 @@ export class Kodi extends Device {
         return button.substr(0, 1).toUpperCase() + button.substr(1);
     }
   }
+
+  public getOptions(): Kodi.Options {
+    return <Kodi.Options>super.getOptions();
+  }
 }
 
 export module Kodi {
-  export interface Options {
+  export interface Options extends Device.Options {
     address: string;
     port?: number;
     mac: string;
